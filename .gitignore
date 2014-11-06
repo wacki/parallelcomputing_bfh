@@ -1,0 +1,11 @@
+# Ignored files
+*.suo
+*.user
+*.sdf
+*.opensdf
+bin
+obj
+lib
+intermediate
+doc/html/
+resources/images/non_final/

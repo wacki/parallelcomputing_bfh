@@ -1,0 +1,52 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2013
+VisualStudioVersion = 12.0.30110.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MinimalExample", "MinimalExample\MinimalExample.vcxproj", "{D1290F29-4E4F-4EDA-8807-9DCB78D41D1E}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PingPong", "PingPong\PingPong.vcxproj", "{D8B20B8C-84A5-443E-AC91-40F08C79896A}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LE_RingNetwork", "LE_RingNetwork\LE_RingNetwork.vcxproj", "{3BF2F670-A6DC-49EB-9F62-593240619014}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LE_TreeNetwork", "LE_TreeNetwork\LE_TreeNetwork.vcxproj", "{8AEBDF8F-8B65-4F77-998C-AFE1B32612CD}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Reduce_2x2MatMultiplication", "Reduce_2x2MatMultiplication\Reduce_2x2MatMultiplication.vcxproj", "{26CF6EBC-C05E-432A-9C76-77D21CC2C13F}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Polling", "Polling\Polling.vcxproj", "{C664102C-ED4C-47F9-93DA-D202A2AB0C47}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D1290F29-4E4F-4EDA-8807-9DCB78D41D1E}.Debug|Win32.ActiveCfg = Debug|Win32
+		{D1290F29-4E4F-4EDA-8807-9DCB78D41D1E}.Debug|Win32.Build.0 = Debug|Win32
+		{D1290F29-4E4F-4EDA-8807-9DCB78D41D1E}.Release|Win32.ActiveCfg = Release|Win32
+		{D1290F29-4E4F-4EDA-8807-9DCB78D41D1E}.Release|Win32.Build.0 = Release|Win32
+		{D8B20B8C-84A5-443E-AC91-40F08C79896A}.Debug|Win32.ActiveCfg = Debug|Win32
+		{D8B20B8C-84A5-443E-AC91-40F08C79896A}.Debug|Win32.Build.0 = Debug|Win32
+		{D8B20B8C-84A5-443E-AC91-40F08C79896A}.Release|Win32.ActiveCfg = Release|Win32
+		{D8B20B8C-84A5-443E-AC91-40F08C79896A}.Release|Win32.Build.0 = Release|Win32
+		{3BF2F670-A6DC-49EB-9F62-593240619014}.Debug|Win32.ActiveCfg = Debug|Win32
+		{3BF2F670-A6DC-49EB-9F62-593240619014}.Debug|Win32.Build.0 = Debug|Win32
+		{3BF2F670-A6DC-49EB-9F62-593240619014}.Release|Win32.ActiveCfg = Release|Win32
+		{3BF2F670-A6DC-49EB-9F62-593240619014}.Release|Win32.Build.0 = Release|Win32
+		{8AEBDF8F-8B65-4F77-998C-AFE1B32612CD}.Debug|Win32.ActiveCfg = Debug|Win32
+		{8AEBDF8F-8B65-4F77-998C-AFE1B32612CD}.Debug|Win32.Build.0 = Debug|Win32
+		{8AEBDF8F-8B65-4F77-998C-AFE1B32612CD}.Release|Win32.ActiveCfg = Release|Win32
+		{8AEBDF8F-8B65-4F77-998C-AFE1B32612CD}.Release|Win32.Build.0 = Release|Win32
+		{26CF6EBC-C05E-432A-9C76-77D21CC2C13F}.Debug|Win32.ActiveCfg = Debug|Win32
+		{26CF6EBC-C05E-432A-9C76-77D21CC2C13F}.Debug|Win32.Build.0 = Debug|Win32
+		{26CF6EBC-C05E-432A-9C76-77D21CC2C13F}.Release|Win32.ActiveCfg = Release|Win32
+		{26CF6EBC-C05E-432A-9C76-77D21CC2C13F}.Release|Win32.Build.0 = Release|Win32
+		{C664102C-ED4C-47F9-93DA-D202A2AB0C47}.Debug|Win32.ActiveCfg = Debug|Win32
+		{C664102C-ED4C-47F9-93DA-D202A2AB0C47}.Debug|Win32.Build.0 = Debug|Win32
+		{C664102C-ED4C-47F9-93DA-D202A2AB0C47}.Release|Win32.ActiveCfg = Release|Win32
+		{C664102C-ED4C-47F9-93DA-D202A2AB0C47}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
