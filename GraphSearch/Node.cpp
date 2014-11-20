@@ -50,15 +50,10 @@ void TreeNode::electLeader()
 		mpi::request req;
 	};
 
-	std::vector<NeighbourRequest> neighbourRequests(_neighbours.size());
+	std::vector<ConnectionObject<TreeLeaderElectMsg>*> neighbourRequests;
 	// build neighbour requests
-	for(int i = 0; i < _neighbours.size(); i++)
-	{
-		NeighbourRequest& nr = neighbourRequests[i];
-		nr.rank = _neighbours[i];
-		nr.gotMsg = false;
-		nr.req = world.irecv(nr.rank, nr.msg.tag(), nr.msg);
-	}
+	for(auto neighbour : _neighbours)
+		neighbourRequests.push_back(new ConnectionObject<TreeLeaderElectMsg>(neighbour));
 
 	// current leader
 	int requestsLeft = neighbourRequests.size();
@@ -75,21 +70,19 @@ void TreeNode::electLeader()
 	{
 		for(auto& nr : neighbourRequests)
 		{
-			if(!nr.gotMsg && nr.req.test().get_ptr() != NULL)
+			if(!nr->done() && nr->poll())
 			{
-
-				nr.gotMsg = true;
-				if(nr.msg.minRank < myMessage.minRank) {
-					std::cout << "[" << world.rank() << "] " << "received a BETTER candidate." << std::endl;
-					myMessage.minRank = nr.msg.minRank;
+				if(nr->msg().minRank < myMessage.minRank) {
+					std::cout << "[" << world.rank() << "] " << "received a BETTER candidate." << nr->msg().minRank << " from " << nr->rank() << std::endl;
+					myMessage.minRank = nr->msg().minRank;
 				}
 				else {
-					std::cout << "[" << world.rank() << "] " << "received a WORSE candidate." << std::endl;
+					std::cout << "[" << world.rank() << "] " << "received a WORSE candidate." << nr->msg().minRank << " from " << nr->rank() << std::endl;
 				}
 				requestsLeft--;
 			}
 			else
-				std::cout << "[" << world.rank() << "] " << "POLLING " << nr.rank << std::endl;
+				std::cout << "[" << world.rank() << "] " << "POLLING " << nr->rank() << std::endl;
 
 		}
 
@@ -109,33 +102,33 @@ void TreeNode::electLeader()
 		std::cout << "[" << world.rank() << "] " << "Only " << requestsLeft << " remaining neighbours, sending candidate" << std::endl;
 
 		// send to the remaining neighbour (can only be one)
-		NeighbourRequest* remainingReq = nullptr;
+		ConnectionObject<TreeLeaderElectMsg>* remainingReq = nullptr;
 		for(auto& nr : neighbourRequests) {
-			if(!nr.gotMsg) {
-				remainingReq = &nr;
+			if(!nr->done()) {
+				remainingReq = nr;
 				break;
 			}
 		}
 
 		// notify remaining neighbour
 
-		std::cout << "[" << world.rank() << "] " << " sending msg to " << remainingReq->rank << std::endl;
-		world.isend(remainingReq->rank, myMessage.tag(), myMessage);
+		std::cout << "[" << world.rank() << "] " << " sending msg to " << remainingReq->rank() << " payload: " << myMessage.minRank << std::endl;
+		world.isend(remainingReq->rank(), myMessage.tag(), myMessage);
 
 		// wait for answers
-		remainingReq->req.wait();
+		remainingReq->wait();
 
 
 		std::cout << "[" << world.rank() << "] " << "Received election msg, leader is " << std::endl;
 		// find better soluton
-		if(remainingReq->msg.minRank < myMessage.minRank)
-			myMessage.minRank = remainingReq->msg.minRank;
+		if(remainingReq->msg().minRank < myMessage.minRank)
+			myMessage.minRank = remainingReq->msg().minRank;
 
-		
+
 		std::cout << "[" << world.rank() << "] " << "Found leader (" << myMessage.minRank << "), notifying neighbours." << std::endl;
 		// notify all other neighbours
 		for(auto neighbour : _neighbours)
-			if(neighbour != remainingReq->rank)
+			if(neighbour != remainingReq->rank())
 				world.isend(neighbour, myMessage.tag(), myMessage);
 	}
 
