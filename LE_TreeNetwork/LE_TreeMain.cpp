@@ -89,7 +89,7 @@ int main()
 	}
 
 	// seed the random gen
-	std::srand(world.rank()*4);
+	std::srand(world.rank() * 4);
 
 	// data for this process
 	rank = world.rank();;
@@ -102,14 +102,14 @@ int main()
 	std::map<int, Message> recvBuffer;
 	int currentLeader = rank;
 	int currentLeaderToken = token;
-	
+
 	printMsg("my token is: " + std::to_string(token));
 
 	// initialize request blocks
 	for(int i : neighbours) {
 		requests[i] = world.irecv(i, 0, recvBuffer[i]);
 	}
-	
+
 	while(true)
 	{
 		// we received from all neighbours except one
