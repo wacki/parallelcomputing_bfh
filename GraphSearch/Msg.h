@@ -1,6 +1,9 @@
 
+#pragma once
+
 #include <boost/mpi.hpp>
 
+namespace mpi = boost::mpi;
 
 enum MessageType {
 	MT_TreeLeaderElect = 0,

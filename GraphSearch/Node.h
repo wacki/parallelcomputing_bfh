@@ -6,6 +6,7 @@
 #include <vector>
 #include <boost/serialization/string.hpp>
 
+
 /*
 todo: 
 
@@ -132,7 +133,7 @@ protected:
 
 };
 */
-
+class TreeLeaderElectMsg;
 
 
 class Node
@@ -158,7 +159,7 @@ public:
 	virtual std::string toString();
 	void addNeighbour(int rank);
 
-	void electLeader();
+	void electLeader(TreeLeaderElectMsg* myMessage);
 
 protected:
 	std::vector<int> _neighbours;
@@ -178,7 +179,7 @@ public:
 	virtual std::string toString();
 	void addEdge(int to, int cost);
 
-	void findMST();
+    void baruvka();
 
 protected:
 	std::vector<GraphEdge> _neighbours;

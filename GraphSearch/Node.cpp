@@ -39,7 +39,7 @@ void TreeNode::addNeighbour(int rank)
 }
 
 // todo make this process generic so that we can reuse it for election of min edge selection
-void TreeNode::electLeader()
+void TreeNode::electLeader(TreeLeaderElectMsg* myMessage)
 {
 	// todo make le work with only one message type
 	struct NeighbourRequest
@@ -58,8 +58,7 @@ void TreeNode::electLeader()
 	// current leader
 	int requestsLeft = neighbourRequests.size();
 	int currentLeader = world.rank();
-	TreeLeaderElectMsg myMessage;
-	myMessage.minRank = currentLeader;
+	myMessage->minRank = currentLeader;
 
 	std::cout << "[" << world.rank() << "] " << "Starting leader election." << std::endl;
 	std::cout << "[" << world.rank() << "] " << "remaining requests: " << _neighbours.size() << "." << std::endl;
@@ -72,9 +71,9 @@ void TreeNode::electLeader()
 		{
 			if(!nr->done() && nr->poll())
 			{
-				if(nr->msg().minRank < myMessage.minRank) {
+				if(nr->msg().minRank < myMessage->minRank) {
 					std::cout << "[" << world.rank() << "] " << "received a BETTER candidate." << nr->msg().minRank << " from " << nr->rank() << std::endl;
-					myMessage.minRank = nr->msg().minRank;
+					myMessage->minRank = nr->msg().minRank;
 				}
 				else {
 					std::cout << "[" << world.rank() << "] " << "received a WORSE candidate." << nr->msg().minRank << " from " << nr->rank() << std::endl;
@@ -91,10 +90,10 @@ void TreeNode::electLeader()
 
 	if(requestsLeft == 0) {
 
-		std::cout << "[" << world.rank() << "] " << "Found leader (" << myMessage.minRank << "), notifying neighbours." << std::endl;
+		std::cout << "[" << world.rank() << "] " << "Found leader (" << myMessage->minRank << "), notifying neighbours." << std::endl;
 		// we know the leader
 		for(auto neighbour : _neighbours)
-			world.isend(neighbour, myMessage.tag(), myMessage);
+			world.isend(neighbour, myMessage->tag(), myMessage);
 	}
 	else
 	{
@@ -112,8 +111,8 @@ void TreeNode::electLeader()
 
 		// notify remaining neighbour
 
-		std::cout << "[" << world.rank() << "] " << " sending msg to " << remainingReq->rank() << " payload: " << myMessage.minRank << std::endl;
-		world.isend(remainingReq->rank(), myMessage.tag(), myMessage);
+		std::cout << "[" << world.rank() << "] " << " sending msg to " << remainingReq->rank() << " payload: " << myMessage->minRank << std::endl;
+		world.isend(remainingReq->rank(), myMessage->tag(), myMessage);
 
 		// wait for answers
 		remainingReq->wait();
@@ -121,71 +120,16 @@ void TreeNode::electLeader()
 
 		std::cout << "[" << world.rank() << "] " << "Received election msg, leader is " << std::endl;
 		// find better soluton
-		if(remainingReq->msg().minRank < myMessage.minRank)
-			myMessage.minRank = remainingReq->msg().minRank;
+		if(remainingReq->msg().minRank < myMessage->minRank)
+			myMessage->minRank = remainingReq->msg().minRank;
 
 
-		std::cout << "[" << world.rank() << "] " << "Found leader (" << myMessage.minRank << "), notifying neighbours." << std::endl;
+		std::cout << "[" << world.rank() << "] " << "Found leader (" << myMessage->minRank << "), notifying neighbours." << std::endl;
 		// notify all other neighbours
 		for(auto neighbour : _neighbours)
 			if(neighbour != remainingReq->rank())
-				world.isend(neighbour, myMessage.tag(), myMessage);
+				world.isend(neighbour, myMessage->tag(), myMessage);
 	}
-
-	/*
-	while(true)
-	{
-		// we received from all neighbours except one
-		if(remainingNeighbours.size() == 1) {
-			Message msg(Message::MT_Candidate, currentLeader, currentLeaderToken);
-			printMsg("single remaining neighbour (" + std::to_string(remainingNeighbours[0]) + ") sending msg");
-			world.send(remainingNeighbours[0], 0, msg);
-		}
-		// we received from everyone we know the leader
-		else if(remainingNeighbours.size() == 0) {
-			for(int neighbour : neighbours) {
-				// TODO: dont always send to all neighbours
-				printMsg("found a leader, sending election msg " + std::to_string(currentLeader));
-				Message msg(Message::MT_LeaderFound, currentLeader, currentLeaderToken);
-				world.isend(neighbour, 0, msg);
-			}
-			break;
-		}
-
-		// poll all neighbours
-		for(int neighbour : remainingNeighbours) {
-
-			// TODO: can we do it without the lock here? if two remain then they could get locked here
-			if(remainingNeighbours.size() == 1) {
-				printMsg("one neighbour remaining, waiting for answer");
-				requests[neighbour].wait();
-			}
-			// skip if we didn't receive anything on the poll
-			else if(requests[neighbour].test().get_ptr() == NULL) {
-				printMsg("polling " + std::to_string(neighbour) + " without success");
-				continue;
-			}
-			else
-				printMsg("POLLING SUCCESS");
-
-
-			const Message& msg = recvBuffer[neighbour];
-			// received a message
-			if(msg.token < currentLeaderToken || msg.token == currentLeaderToken && msg.leader < currentLeader) {
-				printMsg("received a better candidate than current");
-				currentLeader = msg.leader;
-				currentLeaderToken = msg.token;
-			}
-
-			// we only ever receive one message
-			// todo: we could solve this problem by using a copy of remainingneighbours...
-			requests.erase(neighbour);
-			remainingNeighbours.erase(std::remove(remainingNeighbours.begin(), remainingNeighbours.end(), neighbour), remainingNeighbours.end());
-			break;
-		}
-
-		Sleep(1000);
-	}*/
 }
 
 
@@ -207,8 +151,22 @@ void GraphNode::addEdge(int to, int cost)
 
 }
 
-void GraphNode::findMST()
+void GraphNode::baruvka()
 {
+    // keep track of current status
+    TreeNode mst_node;  // mst node for this graph node
+
+    while (true)
+    {
+        // 1. look for shortest in our MST
+        //  run leader election on MST for cheapest edge
+
+        //TreeLeaderElectMsg msg;
+        //mst_node.electLeader(&msg);
+
+        // 2. poll for incoming connections
+
+    }
 
 }
 

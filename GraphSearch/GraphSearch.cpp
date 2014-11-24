@@ -75,6 +75,7 @@ int main()
 #include <map>
 #include <boost/serialization/string.hpp>
 
+#include "Msg.h"
 #include "Node.h"
 
 namespace mpi = boost::mpi;
@@ -212,12 +213,17 @@ int main()
 	}
 
 	TreeNode treeNode;
+    TreeLeaderElectMsg msg;
+
 
 	// fill the tree nodes neighbour struct
 	for(auto neighbour : incidentList[world.rank()])
 		treeNode.addNeighbour(neighbour);
 
-	treeNode.electLeader();
+	treeNode.electLeader(&msg);
+
+    if (world.rank() == 5)
+        std::cout << " final result for 0 is: " << msg.minRank;
 
 	//TreeNode treeNode;
 	//treeNode.leaderElect();
