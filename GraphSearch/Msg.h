@@ -9,7 +9,7 @@
 namespace mpi = boost::mpi;
 
 enum MessageType {
-	MT_TreeLeaderElect = 0,
+	MT_GraphCheapestEdge = 0,
 	MT_TreeGrow = 1,
     MT_CollectMST = 2
 };
@@ -24,6 +24,7 @@ public:
 	{ }
 
 	int tag() { return (int)_type; }
+    std::string toString();
 
 private:
 	MessageType _type;
@@ -42,6 +43,10 @@ public:
         : BaseMessage(MT_TreeGrow)
     { }
 
+    std::string toString()
+    {
+        return "[MSTGrowMsg]";
+    }
 };
 
 class CollectMstNodesMsg : public BaseMessage
@@ -62,6 +67,14 @@ public:
     {
         nodes.insert(other.nodes.begin(), other.nodes.end());
     }
+    std::string toString()
+    {
+        std::ostringstream oss;
+        oss << "[CollectMstNodesMsg] ";
+        for (auto node : nodes)
+            oss << "(" << node << ") ";
+        return oss.str();
+    }
 private:
 	template<class Archive>
 	void serialize(Archive& ar, const unsigned int version)
@@ -71,7 +84,7 @@ private:
 	}
 };
 
-class TreeLeaderElectMsg : public BaseMessage
+class GraphCheapestEdgeMsg : public BaseMessage
 {
 	friend class boost::serialization::access;
 public:
@@ -80,13 +93,13 @@ public:
     int edgeTo;           // cheapest edge destination
     int edgeCost;         // cheapest edge cost
 
-	TreeLeaderElectMsg()
-		: BaseMessage(MT_TreeLeaderElect)
+	GraphCheapestEdgeMsg()
+		: BaseMessage(MT_GraphCheapestEdge)
 	{ }
 
     // only a merge in the sense of the collected nodes
     // its more of an assignment for the other parameters
-    void merge(const TreeLeaderElectMsg& other)
+    void merge(const GraphCheapestEdgeMsg& other)
     {
         minRank = other.minRank;
         minEdgeRank = other.minEdgeRank;
@@ -94,7 +107,7 @@ public:
         edgeCost = other.edgeCost;
     }
 
-    bool operator<(const TreeLeaderElectMsg& rhs) const
+    bool operator<(const GraphCheapestEdgeMsg& rhs) const
     {
         //std::cout << "comparing " << minRank << "(" << edgeCost << ") to " << rhs.minRank << "(" << rhs.edgeCost << ")" << std::endl;
 
@@ -103,6 +116,12 @@ public:
             (edgeCost == rhs.edgeCost // edge costs are the same, select lower rank
             && minRank < rhs.minRank
             ));
+    }
+    std::string toString()
+    {
+        std::ostringstream oss;
+        oss << "[GraphCheapestEdgeMsg] " << "(" << minRank << " -{" << edgeCost << "}-> " << edgeTo << ") min endpoint rank: " << minEdgeRank;
+        return oss.str();
     }
 
 private:
@@ -116,10 +135,6 @@ private:
         ar & edgeCost;
 	}
 };
-
-
-class GraphLeaderElectMsg;
-
 
 
 
@@ -195,4 +210,4 @@ void ConnectionObject<MT>::send(const MT& msg, bool block = false)
 		world.isend(_rank, msg.tag(), msg);
 }
 
-typedef ConnectionObject<TreeLeaderElectMsg> TreeLeaderElectCO;
+typedef ConnectionObject<GraphCheapestEdgeMsg> TreeLeaderElectCO;

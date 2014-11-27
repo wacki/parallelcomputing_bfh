@@ -203,18 +203,17 @@ int main()
 
 	boost::mpi::environment		env;
 	boost::mpi::communicator	world;
-
-
+    
 	if(world.size() != admat.size())
 	{
 		if(world.rank() == 0)
 			std::cout << "Number of processes doesn't match the adjacency list, please use -n " << admat.size() << std::endl;
 		return 1;
 	}
-
+    
 	//TreeNode treeNode;
-    GraphNode graphNode;
-    TreeLeaderElectMsg msg;
+    GraphNode graphNode("GraphSearch_" + std::to_string(world.rank()) + ".log");
+    GraphCheapestEdgeMsg msg;
 
     // fill neighbour list of graph node
     for (int i = 0; i < admat[world.rank()].size(); i++) {
@@ -224,15 +223,6 @@ int main()
     }
 
     graphNode.baruvka();
-        
-    /* tree test
-	// fill the tree nodes neighbour struct
-	for(auto neighbour : incidentList[world.rank()])
-		treeNode.addNeighbour(neighbour);
-
-	treeNode.electLeader(&msg);
-    */
-
 
 
 
