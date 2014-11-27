@@ -1,16 +1,17 @@
 
 #pragma once
 
+#include <algorithm>
+#include <set>
 #include <boost/mpi.hpp>
+#include <boost/serialization/set.hpp>
 
 namespace mpi = boost::mpi;
 
 enum MessageType {
 	MT_TreeLeaderElect = 0,
-	MT_TreeLeaderFound = 1,
-	MT_TreeGrowElect = 2,
-	MT_TreeGrowFound = 3,
-	MT_NeighbourConnected = 4
+	MT_TreeGrow = 1,
+    MT_CollectMST = 2
 };
 
 
@@ -30,27 +31,89 @@ private:
 	template<class Archive>
 	void serialize(Archive& ar, const unsigned int version)
 	{
-		ar & type;
+		ar & _type;
 	}
 };
 
+class MSTGrowMsg : public BaseMessage
+{
+public:
+    MSTGrowMsg()
+        : BaseMessage(MT_TreeGrow)
+    { }
 
+};
+
+class CollectMstNodesMsg : public BaseMessage
+{
+	friend class boost::serialization::access;
+public:
+    std::set<int> nodes;
+
+    CollectMstNodesMsg()
+        : BaseMessage(MT_CollectMST)
+    { }
+    
+    bool operator<(const CollectMstNodesMsg& rhs) const
+    {
+        return true;
+    }
+    void merge(const CollectMstNodesMsg& other)
+    {
+        nodes.insert(other.nodes.begin(), other.nodes.end());
+    }
+private:
+	template<class Archive>
+	void serialize(Archive& ar, const unsigned int version)
+	{
+        ar & boost::serialization::base_object<BaseMessage>(*this);
+        ar & nodes;
+	}
+};
 
 class TreeLeaderElectMsg : public BaseMessage
 {
 	friend class boost::serialization::access;
 public:
-	int minRank;
+	int minRank;          // cheapest edge origin
+    int minEdgeRank;      // min rank of the two end points in the edge
+    int edgeTo;           // cheapest edge destination
+    int edgeCost;         // cheapest edge cost
 
 	TreeLeaderElectMsg()
 		: BaseMessage(MT_TreeLeaderElect)
 	{ }
 
+    // only a merge in the sense of the collected nodes
+    // its more of an assignment for the other parameters
+    void merge(const TreeLeaderElectMsg& other)
+    {
+        minRank = other.minRank;
+        minEdgeRank = other.minEdgeRank;
+        edgeTo = other.edgeTo;
+        edgeCost = other.edgeCost;
+    }
+
+    bool operator<(const TreeLeaderElectMsg& rhs) const
+    {
+        //std::cout << "comparing " << minRank << "(" << edgeCost << ") to " << rhs.minRank << "(" << rhs.edgeCost << ")" << std::endl;
+
+        return (edgeCost < rhs.edgeCost // our edge cost is better
+            ||
+            (edgeCost == rhs.edgeCost // edge costs are the same, select lower rank
+            && minRank < rhs.minRank
+            ));
+    }
+
 private:
 	template<class Archive>
 	void serialize(Archive& ar, const unsigned int version)
 	{
+        ar & boost::serialization::base_object<BaseMessage>(*this);
 		ar & minRank;
+        ar & minEdgeRank;
+        ar & edgeTo;
+        ar & edgeCost;
 	}
 };
 

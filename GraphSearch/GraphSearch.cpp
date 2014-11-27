@@ -205,28 +205,33 @@ int main()
 	boost::mpi::communicator	world;
 
 
-	if(world.size() != incidentList.size())
+	if(world.size() != admat.size())
 	{
 		if(world.rank() == 0)
-			std::cout << "Number of processes doesn't match the adjacency list, please use -n " << incidentList.size() << std::endl;
+			std::cout << "Number of processes doesn't match the adjacency list, please use -n " << admat.size() << std::endl;
 		return 1;
 	}
 
-	TreeNode treeNode;
+	//TreeNode treeNode;
+    GraphNode graphNode;
     TreeLeaderElectMsg msg;
 
+    // fill neighbour list of graph node
+    for (int i = 0; i < admat[world.rank()].size(); i++) {
+		if(admat[world.rank()][i] > 0) {
+			graphNode.addEdge(i, admat[world.rank()][i]);
+		}
+    }
 
+    graphNode.baruvka();
+        
+    /* tree test
 	// fill the tree nodes neighbour struct
 	for(auto neighbour : incidentList[world.rank()])
 		treeNode.addNeighbour(neighbour);
 
 	treeNode.electLeader(&msg);
-
-    if (world.rank() == 5)
-        std::cout << " final result for 0 is: " << msg.minRank;
-
-	//TreeNode treeNode;
-	//treeNode.leaderElect();
+    */
 
 
 

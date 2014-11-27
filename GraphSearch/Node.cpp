@@ -4,6 +4,12 @@
 #include "Msg.h"
 
 
+void logMsg(LogVerbosity verb, const std::string& msg)
+{
+
+}
+
+
 Node::Node()
 {
 
@@ -29,107 +35,19 @@ TreeNode::TreeNode()
 std::string TreeNode::toString()
 {
 	std::ostringstream oss;
-	oss << "Tree Node";
+    oss << "TreeNode [" << world.rank() << "] neighbours: ";
+    for (auto i : _neighbours)
+        oss << "(" << i << ") ";
+
 	return oss.str();
 }
 
 void TreeNode::addNeighbour(int rank)
 {
+	if(std::find(_neighbours.begin(), _neighbours.end(), rank) != _neighbours.end())
+		return;
+
 	_neighbours.push_back(rank);
-}
-
-// todo make this process generic so that we can reuse it for election of min edge selection
-void TreeNode::electLeader(TreeLeaderElectMsg* myMessage)
-{
-	// todo make le work with only one message type
-	struct NeighbourRequest
-	{
-		int rank;
-		bool gotMsg;
-		TreeLeaderElectMsg msg;
-		mpi::request req;
-	};
-
-	std::vector<ConnectionObject<TreeLeaderElectMsg>*> neighbourRequests;
-	// build neighbour requests
-	for(auto neighbour : _neighbours)
-		neighbourRequests.push_back(new ConnectionObject<TreeLeaderElectMsg>(neighbour));
-
-	// current leader
-	int requestsLeft = neighbourRequests.size();
-	int currentLeader = world.rank();
-	myMessage->minRank = currentLeader;
-
-	std::cout << "[" << world.rank() << "] " << "Starting leader election." << std::endl;
-	std::cout << "[" << world.rank() << "] " << "remaining requests: " << _neighbours.size() << "." << std::endl;
-
-
-	// wait for leader elect messages 
-	while(requestsLeft > 1)
-	{
-		for(auto& nr : neighbourRequests)
-		{
-			if(!nr->done() && nr->poll())
-			{
-				if(nr->msg().minRank < myMessage->minRank) {
-					std::cout << "[" << world.rank() << "] " << "received a BETTER candidate." << nr->msg().minRank << " from " << nr->rank() << std::endl;
-					myMessage->minRank = nr->msg().minRank;
-				}
-				else {
-					std::cout << "[" << world.rank() << "] " << "received a WORSE candidate." << nr->msg().minRank << " from " << nr->rank() << std::endl;
-				}
-				requestsLeft--;
-			}
-			else
-				std::cout << "[" << world.rank() << "] " << "POLLING " << nr->rank() << std::endl;
-
-		}
-
-		Sleep(1000);
-	}
-
-	if(requestsLeft == 0) {
-
-		std::cout << "[" << world.rank() << "] " << "Found leader (" << myMessage->minRank << "), notifying neighbours." << std::endl;
-		// we know the leader
-		for(auto neighbour : _neighbours)
-			world.isend(neighbour, myMessage->tag(), myMessage);
-	}
-	else
-	{
-
-		std::cout << "[" << world.rank() << "] " << "Only " << requestsLeft << " remaining neighbours, sending candidate" << std::endl;
-
-		// send to the remaining neighbour (can only be one)
-		ConnectionObject<TreeLeaderElectMsg>* remainingReq = nullptr;
-		for(auto& nr : neighbourRequests) {
-			if(!nr->done()) {
-				remainingReq = nr;
-				break;
-			}
-		}
-
-		// notify remaining neighbour
-
-		std::cout << "[" << world.rank() << "] " << " sending msg to " << remainingReq->rank() << " payload: " << myMessage->minRank << std::endl;
-		world.isend(remainingReq->rank(), myMessage->tag(), myMessage);
-
-		// wait for answers
-		remainingReq->wait();
-
-
-		std::cout << "[" << world.rank() << "] " << "Received election msg, leader is " << std::endl;
-		// find better soluton
-		if(remainingReq->msg().minRank < myMessage->minRank)
-			myMessage->minRank = remainingReq->msg().minRank;
-
-
-		std::cout << "[" << world.rank() << "] " << "Found leader (" << myMessage->minRank << "), notifying neighbours." << std::endl;
-		// notify all other neighbours
-		for(auto neighbour : _neighbours)
-			if(neighbour != remainingReq->rank())
-				world.isend(neighbour, myMessage->tag(), myMessage);
-	}
 }
 
 
@@ -148,26 +66,133 @@ std::string GraphNode::toString()
 
 void GraphNode::addEdge(int to, int cost)
 {
-
+	GraphEdge edge;
+	edge.to = to;
+	edge.cost = cost;
+	_neighbours.push_back(edge);
 }
 
 void GraphNode::baruvka()
 {
     // keep track of current status
-    TreeNode mst_node;  // mst node for this graph node
+    TreeNode mstNode;          // mst node for this graph node
+    //std::vector<GraphEdge> mstNodes; // candidate nodes
+	std::map<int, int> mstNodes; // map containing <destination, cost> for mst candidate nodes
+	std::vector<ConnectionObject<MSTGrowMsg>*> candidateRequests;
 
-    while (true)
-    {
-        // 1. look for shortest in our MST
-        //  run leader election on MST for cheapest edge
+	for(auto& neighbour : _neighbours) {
+		mstNodes[neighbour.to] = neighbour.cost;	// candidate neighbours to be added to the mst
+		// create a request object for all candidates
+		//candidateRequests.push_back(new ConnectionObject<MSTGrowMsg>(neighbour.to, false));
+	}
 
-        //TreeLeaderElectMsg msg;
-        //mst_node.electLeader(&msg);
+	// print current candidates 
+	std::cout << "[" << world.rank() << "] " << "Possible MST candidates: ";
+	for(auto edge : mstNodes)
+		std::cout << "(to: " << edge.first << ", cost: " << edge.second << ") ";
+	std::cout << std::endl;
+    
+    
+    while (true)    {
+        // 1. find edge candidates for current node and add it to the msg
+        TreeLeaderElectMsg msg;
+        GraphEdge minEdge;
+        minEdge.to = INT_MAX;
+        minEdge.cost = INT_MAX;
+        int minEdgeRank = INT_MAX;
+        for (auto candidate : mstNodes) {
+			int dest = candidate.first;
+			int cost = candidate.second;
+			if(cost < minEdge.cost ||
+			   (cost == minEdge.cost) && dest < minEdge.to) {
+				minEdge.cost = cost;
+				minEdge.to = dest;
+                minEdgeRank = min(dest, world.rank()); // get the min rank of the two nodes forming this edge
+			}
+        }
+		// no candidate was found
+		if(minEdge.to == INT_MAX) {
 
-        // 2. poll for incoming connections
+			std::cout << "[" << world.rank() << "] " << "No suitable candidate found" << std::endl;
+		}
+        else {
+            std::cout << "[" << world.rank() << "] " << "candidate node found: (to: " << minEdge.to << ", cost: " << minEdge.cost << ")" << std::endl;
+        }
 
+        msg.minRank = world.rank();
+        msg.minEdgeRank = minEdgeRank;
+        msg.edgeTo = minEdge.to;
+        msg.edgeCost = minEdge.cost;
+
+        std::cout << "[" << world.rank() << "] current tree: " << mstNode.toString() << std::endl;
+
+        // 2. run leader election to find the best edge in our mst
+        mstNode.electLeader<TreeLeaderElectMsg>(&msg);
+        
+        // break if we didn't find anything
+		if(msg.edgeTo == INT_MAX)
+			break;
+
+		std::cout << "[" << world.rank() << "] " << "BEST MST EDGE: " << msg.minRank << " -> " << msg.edgeTo << "(" << msg.edgeCost << ")" << std::endl;
+        
+		// leader election found no more edge, exit
+        
+                
+        // 3. if our node won the election send a notification to the neighbour that was selected
+        if (msg.minRank == world.rank()) {
+            MSTGrowMsg growMsg;
+
+            if (msg.minEdgeRank == world.rank()) {
+			    std::cout << "[" << world.rank() << "] " << "Sending grow msg to: " << msg.edgeTo << std::endl;
+                world.send(msg.edgeTo, growMsg.tag(), growMsg);
+                //world.recv(msg.edgeTo, growMsg.tag(), growMsg); // we have to wait for an 'ack' response to go on with it
+            }
+            else {
+			    std::cout << "[" << world.rank() << "] " << "Waiting for grow msg from: " << msg.edgeTo << std::endl;
+                world.recv(msg.edgeTo, growMsg.tag(), growMsg); // we have to wait for an 'ack' response to go on with it
+                
+                std::cout << "[" << world.rank() << "] " << "successfully received grow msg from " << msg.edgeTo << std::endl;
+                //world.send(msg.edgeTo, growMsg.tag(), growMsg);
+                //std::cout << "[" << world.rank() << "] " << "successfully received grow msg from " << msg.edgeTo << std::endl;
+                //if (world.rank() == 4) std::cout << "\n\n---------------------------------------" << std::endl;
+            }
+
+            mstNode.addNeighbour(msg.edgeTo); // also add the found node to the mst neighbour list
+			mstNodes.erase(msg.edgeTo); // remove the new connection as possible candidate
+        }
+		
+        // update MST node list
+        CollectMstNodesMsg collectMsg;
+        mstNode.insertNeighboursInSet(collectMsg.nodes);
+        mstNode.electLeader<CollectMstNodesMsg>(&collectMsg);
+
+		// listen to incoming grow messages
+		/*for(auto req : candidateRequests) {
+			if(!req->done() && req->poll()) { // todo, find a better way to remove request objects, need the same amount as candidates
+				mstNode.addNeighbour(req->rank());
+				mstNodes.erase(req->rank()); // remove the new connection as possible candidate
+
+			    std::cout << "[" << world.rank() << "] " << "received new connection from " << req->rank() << std::endl;
+			}				
+		}*/
+		// update candidate list based on list in the msg
+		for(auto connected : collectMsg.nodes) {
+			if(mstNodes.find(connected) != mstNodes.end()) {
+				mstNodes.erase(connected);	// remove nodes that were encountered during the previous leader election as possible candidates
+				std::cout << "[" << world.rank() << "] " << "removing " << connected << " as possible candidate since it's already in our MST" << std::endl;
+			}
+		}
+        //Sleep(1000);
+        // else just update our viable candidates based on the current mst
+            // g oover the nodes list in the msg and remove all the nodes in there that are the same
+
+
+        // 4. listen to incoming connect messages and update the list if necessary
+        
     }
 
+    // print out result
+        std::cout << "[" << world.rank() << "] current tree: " << mstNode.toString() << std::endl;
 }
 
 

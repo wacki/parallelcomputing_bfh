@@ -3,9 +3,11 @@
 #include <boost/mpi.hpp>
 
 #include <map>
+#include <set>
 #include <vector>
+#include <string>
 #include <boost/serialization/string.hpp>
-
+#include <fstream>
 
 /*
 todo: 
@@ -136,6 +138,52 @@ protected:
 class TreeLeaderElectMsg;
 
 
+enum LogVerbosity {
+    LV_Quiet,
+    LV_Minimal,
+    LV_Normal,
+    LV_Detailed,
+    LV_Diagnostic
+};
+
+class Log
+{
+public:
+    Log(LogVerbosity verb, const std::string& fileAll, const std::string& fileSelf)
+    {
+        _verbosity = verb;
+        _ofsAll.open(fileAll, std::ofstream::out | std::ofstream::app); // append to the general file
+        _ofsSelf.open(fileSelf);
+    }
+
+    ~Log()
+    {
+        if (_ofsAll.is_open())
+            _ofsAll.close();
+        
+        if (_ofsSelf.is_open())
+            _ofsSelf.close();
+    }
+
+    void logMsg(LogVerbosity verb, const std::string& msg)
+    {
+        if (_verbosity < verb)
+            return;
+
+        std::cout << msg;
+        _ofsAll << msg;
+        _ofsAll.flush();
+        _ofsSelf << msg;
+        _ofsSelf.flush();
+    }
+
+private:
+    LogVerbosity    _verbosity;
+    std::ofstream   _ofsAll;
+    std::ofstream   _ofsSelf;
+
+};
+
 class Node
 {
 public:
@@ -159,7 +207,16 @@ public:
 	virtual std::string toString();
 	void addNeighbour(int rank);
 
-	void electLeader(TreeLeaderElectMsg* myMessage);
+
+
+    // todo make this process generic so that we can reuse it for election of min edge selection
+    template<class MT>
+    void electLeader(MT* myMessage);
+
+    void insertNeighboursInSet(std::set<int>& neighbours) const
+    {
+        neighbours.insert(_neighbours.begin(), _neighbours.end());
+    }
 
 protected:
 	std::vector<int> _neighbours;
@@ -184,3 +241,104 @@ public:
 protected:
 	std::vector<GraphEdge> _neighbours;
 };
+
+
+
+
+
+// template impl
+
+template<class MT>
+void TreeNode::electLeader(MT* myMessage)
+{
+        bool outputLog = false;
+	// todo make le work with only one message type
+	struct NeighbourRequest
+	{
+		int rank;
+		bool gotMsg;
+		TreeLeaderElectMsg msg;
+		mpi::request req;
+	};
+
+	std::vector<ConnectionObject<MT>*> neighbourRequests;
+	// build neighbour requests
+	for(auto neighbour : _neighbours)
+		neighbourRequests.push_back(new ConnectionObject<MT>(neighbour));
+
+	// current leader
+	int requestsLeft = neighbourRequests.size();
+
+	if(outputLog) std::cout << "[" << world.rank() << "] " << "Starting leader election." << std::endl;
+	if(outputLog) std::cout << "[" << world.rank() << "] " << "remaining requests: " << _neighbours.size() << "." << std::endl;
+
+
+	// wait for leader elect messages 
+	while(requestsLeft > 1)
+	{
+		for(auto& nr : neighbourRequests)
+		{
+			if(!nr->done() && nr->poll())
+			{
+				if(nr->msg() < (*myMessage)) {
+					//if(outputLog) std::cout << "[" << world.rank() << "] " << "received a BETTER candidate." << nr->msg().minRank << " from " << nr->rank() << std::endl;
+                    myMessage->merge(nr->msg());
+				}
+				else {
+					//if(outputLog) std::cout << "[" << world.rank() << "] " << "received a WORSE candidate." << nr->msg().minRank << " from " << nr->rank() << std::endl;
+				}
+				requestsLeft--;
+			}
+			else
+				if(outputLog) std::cout << "[" << world.rank() << "] " << "POLLING " << nr->rank() << std::endl;
+
+		}
+
+		//Sleep(1000);
+	}
+
+	if(requestsLeft == 0) {
+
+		//if(outputLog) std::cout << "[" << world.rank() << "] " << "Found leader (" << myMessage->minRank << "), notifying neighbours." << std::endl;
+		// we know the leader
+		for(auto neighbour : _neighbours)
+			world.isend(neighbour, myMessage->tag(), *myMessage);
+	}
+	else
+	{
+        // we land here if we have only one neighbour left, if there are more then something went wrong.
+        assert(requestsLeft == 1 && "Remaining request count higher than expected.");
+
+		if(outputLog) std::cout << "[" << world.rank() << "] " << "Only " << requestsLeft << " remaining neighbours, sending candidate" << std::endl;
+
+		// send to the remaining neighbour (can only be one)
+		ConnectionObject<MT>* remainingReq = nullptr;
+		for(auto& nr : neighbourRequests) {
+			if(!nr->done()) {
+				remainingReq = nr;
+				break;
+			}
+		}
+
+		// notify remaining neighbour
+		//if(outputLog) std::cout << "[" << world.rank() << "] " << " sending msg to " << remainingReq->rank() << " payload: " << myMessage->minRank << ", " << myMessage->edgeTo << ", " << myMessage->edgeCost << ", " << myMessage->minEdgeRank << ", " << std::endl;
+		world.isend(remainingReq->rank(), myMessage->tag(), *myMessage);
+
+		// wait for answers
+		remainingReq->wait();
+
+        
+		// find better soluton
+		if(remainingReq->msg() < (*myMessage))
+            myMessage->merge(remainingReq->msg());
+       // if (outputLog) std::cout << "[" << world.rank() << "] message received: " << remainingReq->msg().minRank << ", " << remainingReq->msg().edgeTo << ", " << remainingReq->msg().edgeCost << ", " << remainingReq->msg().minEdgeRank << ", " << std::endl;
+		//if(outputLog) std::cout << "[" << world.rank() << "] " << "Received election msg, leader is " << myMessage->minRank << std::endl;
+
+
+		//if(outputLog) std::cout << "[" << world.rank() << "] " << "Found leader (" << myMessage->minRank << "), notifying neighbours." << std::endl;
+		// notify all other neighbours
+		for(auto neighbour : _neighbours)
+			if(neighbour != remainingReq->rank())
+				world.isend(neighbour, myMessage->tag(), *myMessage);
+	}
+}
