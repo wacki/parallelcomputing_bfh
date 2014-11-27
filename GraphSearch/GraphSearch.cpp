@@ -212,7 +212,9 @@ int main()
 	}
     
 	//TreeNode treeNode;
-    GraphNode graphNode("GraphSearch_" + std::to_string(world.rank()) + ".log");
+    Log::singleton().open("GraphSearch_" + std::to_string(world.rank()) + ".log"); // set log file
+    Log::singleton().setVerbosity(LV_Detailed);
+    GraphNode graphNode;
     GraphCheapestEdgeMsg msg;
 
     // fill neighbour list of graph node
