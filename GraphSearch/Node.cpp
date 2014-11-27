@@ -1,5 +1,5 @@
 
-#include "Windows.h"
+#include <algorithm>
 #include "Node.h"
 #include "Msg.h"
 
@@ -102,7 +102,7 @@ void GraphNode::baruvka()
 			   (cost == minEdge.cost) && dest < minEdge.to) {
 				minEdge.cost = cost;
 				minEdge.to = dest;
-                minEdgeRank = min(dest, world.rank()); // get the min rank of the two nodes forming this edge
+                minEdgeRank = std::min(dest, world.rank()); // get the min rank of the two nodes forming this edge
 			}
         }
 		// no candidate was found
@@ -170,7 +170,7 @@ void GraphNode::baruvka()
 			}
 		}
         
-        Sleep(1000);
+        //Sleep(1000);
         
     }
 
